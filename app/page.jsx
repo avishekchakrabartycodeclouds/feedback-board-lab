@@ -22,19 +22,46 @@ export default function FeedbackPage() {
   }, []);
 
   async function handleSubmit(e) {
-    e.preventDefault();
-    setStatus('Submitting...');
-    // FLAW #2: No client-side validation either — any shape/length goes
-    await fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, text }),
-    });
-    setName('');
-    setText('');
-    setStatus('Submitted!');
-    loadFeedback();
+  e.preventDefault();
+
+  const trimmedName = name.trim();
+  const trimmedText = text.trim();
+
+  if (!trimmedName || !trimmedText) {
+    setStatus("Name and feedback are required.");
+    return;
   }
+
+  if (trimmedName.length > 50) {
+    setStatus("Name must be less than 50 characters.");
+    return;
+  }
+
+  if (trimmedText.length > 1000) {
+    setStatus("Feedback must be less than 1000 characters.");
+    return;
+  }
+
+  setStatus("Submitting...");
+
+  await fetch("/api/feedback", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: trimmedName,
+      text: trimmedText,
+    }),
+  });
+
+  setName("");
+  setText("");
+
+  setStatus("Submitted!");
+
+  loadFeedback();
+}
 
   async function handleDelete(id) {
     // FLAW #4: Sends isAdmin from client; server trusts it without real auth
@@ -88,7 +115,7 @@ export default function FeedbackPage() {
               {item.createdAt}
             </span>
             {/* FLAW #3: Stored XSS — item.text rendered as raw HTML */}
-            <p dangerouslySetInnerHTML={{ __html: item.text }} />
+            <p>{item.text}</p>
             {isAdmin && (
               <button
                 onClick={() => handleDelete(item.id)}

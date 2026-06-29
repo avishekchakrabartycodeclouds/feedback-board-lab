@@ -10,54 +10,91 @@ const ADMIN_KEY = 'sk-admin-12345'; // admin key
 // The call below always falls through to the raw value because the function doesn't exist.
 
 export async function GET() {
-  const items = readAll();
-  const formatted = items.map((item) => ({
-    ...item,
-    // from our date utils
-    displayTime: typeof formatRelativeTime === 'function'
-      ? formatRelativeTime(item.createdAt)
-      : item.createdAt,
-  }));
-  return NextResponse.json(formatted);
+  try {
+    const items = readAll();
+
+    return NextResponse.json(items);
+  } catch (error) {
+    console.error("GET Error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to load feedback." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request) {
-  const body = await request.json();
-  const items = readAll();
-
-  // FLAW #2: No input validation — name/text not checked for type, length, or content
-  const newItem = {
-    id: Date.now().toString(),
-    name: body.name,
-    text: body.text,
-    createdAt: new Date().toISOString(),
-  };
-
-  items.push(newItem);
-
-  // FLAW #5: Silent failure — if the write fails, the error is swallowed entirely
   try {
-    writeAll(items);
-  } catch (e) {}
+    const body = await request.json();
 
-  return NextResponse.json(newItem, { status: 201 });
+    const name = body.name?.trim();
+    const text = body.text?.trim();
+
+    // Server-side validation
+    if (!name || !text) {
+      return NextResponse.json(
+        { error: "Name and feedback are required." },
+        { status: 400 }
+      );
+    }
+
+    if (typeof name !== "string" || typeof text !== "string") {
+      return NextResponse.json(
+        { error: "Invalid input." },
+        { status: 400 }
+      );
+    }
+
+    if (name.length > 50) {
+      return NextResponse.json(
+        { error: "Name cannot exceed 50 characters." },
+        { status: 400 }
+      );
+    }
+
+    if (text.length > 1000) {
+      return NextResponse.json(
+        { error: "Feedback cannot exceed 1000 characters." },
+        { status: 400 }
+      );
+    }
+
+    const items = readAll();
+
+    const newItem = {
+      id: Date.now().toString(),
+      name,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    items.push(newItem);
+
+    writeAll(items);
+
+    return NextResponse.json(newItem, {
+      status: 201,
+    });
+
+  } catch (error) {
+    console.error("POST Error:", error);
+
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
 }
 
-export async function DELETE(request) {
-  const body = await request.json();
-
-  // FLAW #4: Trusts isAdmin from the client body — no real authentication
-  if (!body.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const items = readAll();
-  const updated = items.filter((item) => item.id !== body.id);
-
-  // FLAW #5: Same silent failure pattern on delete write
-  try {
-    writeAll(updated);
-  } catch (e) {}
-
-  return NextResponse.json({ success: true });
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error:
+        "Delete operation requires proper authentication and is disabled in this demo.",
+    },
+    {
+      status: 501,
+    }
+  );
 }
